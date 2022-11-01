@@ -32,7 +32,7 @@ setup(
     author='Kaloian Manassiev',
     author_email='kaloianm@gmail.com',
     description=('Python module which is an object-oriented front to the ModemManager D-Bus API.'),
-    long_description=read('README'),
+    long_description=read('README.md'),
     license=read('LICENSE'),
     packages=['PyMM'],
 )
