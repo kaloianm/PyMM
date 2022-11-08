@@ -20,7 +20,7 @@ from PyMM import ModemManagerBusName
 
 
 class Bearer:
-    '''Represents a single Bearer managed by the ModemManager service'''
+    '''Represents a single Bearer managed by a specific Modem'''
 
     _bearer_interface_name = 'org.freedesktop.ModemManager1.Bearer'
 

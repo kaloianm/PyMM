@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.9
+#!/usr/bin/env python3
 #
 
 # Copyright 2022 Kaloian Manassiev
@@ -29,6 +29,7 @@ from PyMM.modem import ModemState
 
 
 class ModemController:
+
     def __init__(self):
         self.mm = ModemManager()
 
@@ -102,6 +103,7 @@ class ModemController:
 
 
 class ReceivedSMS:
+
     def __init__(self, win):
         self._win = win
         self._win.addstr(0, 0, 'Received SMS', curses.A_STANDOUT)
@@ -115,6 +117,7 @@ class ReceivedSMS:
 
 
 class Internet:
+
     def __init__(self, win):
         self._win = win
         self._win.addstr(0, 0, 'Internet connection', curses.A_STANDOUT)

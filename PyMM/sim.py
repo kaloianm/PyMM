@@ -20,7 +20,7 @@ from PyMM import ModemManagerBusName
 
 
 class Sim:
-    '''Represents a single Sim card managed by the ModemManager service'''
+    '''Represents a single Sim card managed by a specific Modem'''
 
     _sim_interface_name = 'org.freedesktop.ModemManager1.Sim'
 

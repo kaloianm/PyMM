@@ -23,7 +23,7 @@ from PyMM import ModemManagerBusName
 
 
 class ModemManager:
-    '''The top-level class serving as root for interaction with the ModemManager D-Bus service'''
+    '''Represents the top-level ModemManager D-Bus service'''
 
     _modem_manager_interface_name = 'org.freedesktop.ModemManager1'
 
