@@ -23,7 +23,7 @@ import curses
 import os
 import logging
 
-from curses import wrapper
+from curses import echo, wrapper
 from PyMM import ModemManager
 from PyMM.modem import ModemState
 
@@ -48,19 +48,6 @@ class ModemController:
         if modem.State == ModemState.MM_MODEM_STATE_FAILED:
             logging.info('Resetting modem because it is in state FAILED ...')
             modem.Reset()
-
-            return True
-
-        if modem.State == ModemState.MM_MODEM_STATE_LOCKED:
-            logging.info('Unlocking modem ...')
-            sim = modem.Sim
-            sim.SendPin('4271')
-
-            return True
-
-        if modem.State == ModemState.MM_MODEM_STATE_DISABLED:
-            logging.info('Enabling modem ...')
-            modem.Enable(True)
 
             return True
 
@@ -102,11 +89,45 @@ class ModemController:
         return False
 
 
-class ReceivedSMS:
+class Controller:
 
-    def __init__(self, win):
-        self._win = win
-        self._win.addstr(0, 0, 'Received SMS', curses.A_STANDOUT)
+    def __init__(self, window_title, modem):
+        self._win = curses.newwin(curses.LINES - 1, curses.COLS - 1, 0, 0)
+        self._modem = modem
+
+        self._win.addstr(0, 0, window_title, curses.A_STANDOUT)
+
+
+class SelectModem(Controller):
+
+    def __init__(self, mm, current_modem):
+        super().__init__('Select modem', current_modem)
+        self._mm = mm
+
+    def select(self):
+        self._win.addstr(2, 1, '(P) Back to the previous menu')
+        while True:
+            key = self._win.getkey()
+            if key == 'p' or key == 'P':
+                return self._modem
+
+
+class UnlockModem(Controller):
+
+    def __init__(self, modem):
+        super().__init__('Unlock modem', modem)
+
+    def unlock(self):
+        curses.echo()
+        self._win.addstr(2, 0, 'Enter PIN: ')
+        PIN = self._win.getstr(4).decode('utf-8')
+        self._modem.Sim.SendPin(PIN)
+
+
+class ReceivedSMS(Controller):
+
+    def __init__(self, modem):
+        super().__init__('Received SMS', modem)
 
     def show(self):
         self._win.addstr(2, 1, '(P) Back to the previous menu')
@@ -116,11 +137,23 @@ class ReceivedSMS:
                 break
 
 
-class Internet:
+class SendSMS(Controller):
 
-    def __init__(self, win):
-        self._win = win
-        self._win.addstr(0, 0, 'Internet connection', curses.A_STANDOUT)
+    def __init__(self, modem):
+        super().__init__('Send SMS', modem)
+
+    def show(self):
+        self._win.addstr(2, 1, '(P) Back to the previous menu')
+        while True:
+            key = self._win.getkey()
+            if key == 'p' or key == 'P':
+                break
+
+
+class Internet(Controller):
+
+    def __init__(self, modem):
+        super().__init__('Internet', modem)
 
     def show(self):
         self._win.addstr(2, 1, '(0) Connect')
@@ -150,27 +183,55 @@ def wrapped_main(stdscr):
 
     while True:
         stdscr.clear()
+
         stdscr.addstr(0, 0,
                       f'ModemManager {mm.Version} with {len(mm.managed_modems)} managed modems',
                       curses.A_BOLD)
-        stdscr.addstr(2, 0, f'Select an option from the menu:', curses.A_STANDOUT)
 
-        stdscr.addstr(4, 1, '(0) Received SMS')
-        stdscr.addstr(5, 1, '(1) Send SMS')
-        stdscr.addstr(6, 1, '(2) Internet')
-        stdscr.addstr(7, 1, '(Q) Quit')
+        modem = None
+
+        if len(mm.managed_modems) > 0:
+            modem = list(mm.managed_modems.values())[0]
+            stdscr.addstr(2, 0, f'Active modem (Press M to change, U to unlock): {modem}',
+                          curses.A_BOLD)
+            stdscr.addstr(3, 1, f'Manufacturer: {modem.Manufacturer}')
+            stdscr.addstr(4, 1, f'State: {modem.State.name}')
+            stdscr.addstr(5, 1, f'SIM IMEI: {modem.Sim.SimIdentifier}, SIM IMSI: {modem.Sim.Imsi}')
+
+            stdscr.addstr(7, 0, f'Select an option from the menu:', curses.A_STANDOUT)
+
+            stdscr.addstr(8, 1, '(0) Received SMS')
+            stdscr.addstr(9, 1, '(1) Send SMS')
+            stdscr.addstr(10, 1, '(2) Internet')
+            stdscr.addstr(11, 1, '(E) Enable modem')
+            stdscr.addstr(12, 1, '(R) Reset modem')
+
+        stdscr.addstr(13, 1, '(Q) Quit')
         stdscr.refresh()
+
         key = stdscr.getkey()
-        if key == '0':
-            win = curses.newwin(curses.LINES - 1, curses.COLS - 1, 0, 0)
-            messages = ReceivedSMS(win)
-            messages.show()
-        if key == '1':
-            pass
-        if key == '2':
-            win = curses.newwin(curses.LINES - 1, curses.COLS - 1, 0, 0)
-            messages = Internet(win)
-            messages.show()
+
+        if modem:
+            if key == 'm' or key == 'M':
+                controller = SelectModem(mm, modem)
+                modem = controller.select()
+            if key == 'u' or key == 'U':
+                controller = UnlockModem(modem)
+                controller.unlock()
+            if key == '0':
+                controller = ReceivedSMS(modem)
+                controller.show()
+            if key == '1':
+                controller = SendSMS(modem)
+                controller.show()
+            if key == '2':
+                controller = Internet(modem)
+                controller.show()
+            if key == 'e' or key == 'E':
+                modem.Enable(True)
+            if key == 'r' or key == 'R':
+                modem.Reset()
+
         if key == 'q' or key == 'Q':
             break
 

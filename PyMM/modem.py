@@ -60,10 +60,10 @@ class Modem:
             raise Exception()
 
     def __str__(self):
-        return f'Modem @ {self._path}'
+        return self._path
 
     def __repr__(self):
-        return f'Modem @ {self._path}'
+        return self._path
 
     @property
     def all_properties(self):
