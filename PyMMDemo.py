@@ -142,7 +142,9 @@ class Internet:
         pass
 
 
-def main(stdscr):
+def wrapped_main(stdscr):
+    '''Curses wrapped entrypoint for the application'''
+
     mm = ModemManager()
     logging.info(f'Found Modem Manager {mm} {mm.all_properties}')
 
@@ -174,6 +176,11 @@ def main(stdscr):
 
 
 def script_main():
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
+    '''Main entrypoint for the PyMMDemo application'''
 
-    wrapper(main)
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
+    wrapper(wrapped_main)
+
+
+if __name__ == '__main__':
+    script_main()
