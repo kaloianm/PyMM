@@ -173,12 +173,7 @@ def main(stdscr):
             break
 
 
-if __name__ == '__main__':
+def script_main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
 
-    if os.geteuid() != 0:
-        raise Exception('You need to have root privileges to run this script.')
-
     wrapper(main)
-else:
-    raise Exception('PyMMUI.py may only be run as an application')

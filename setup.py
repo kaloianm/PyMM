@@ -35,4 +35,7 @@ setup(
     long_description=read('README.md'),
     license=read('LICENSE'),
     packages=['PyMM'],
+    entry_points={
+        'console_scripts': ['PyMMUI=PyMMUI:script_main'],
+    },
 )
