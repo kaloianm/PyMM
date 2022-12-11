@@ -75,6 +75,18 @@ class Modem:
         return self.get_property('Manufacturer')
 
     @property
+    def Model(self):
+        return self.get_property('Model')
+
+    @property
+    def SignalQuality(self):
+        return self.get_property('SignalQuality')
+
+    @property
+    def CarrierConfiguration(self):
+        return self.get_property('CarrierConfiguration')
+
+    @property
     def State(self):
         return ModemState(self.get_property('State'))
 
