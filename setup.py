@@ -22,7 +22,7 @@ from setuptools import setup
 
 
 def read(fname):
-    '''Utility function to read the README file.'''
+    '''Utility function to read the README/LICENSE files.'''
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
@@ -36,6 +36,6 @@ setup(
     license=read('LICENSE'),
     packages=['PyMM'],
     entry_points={
-        'console_scripts': ['PyMMUI=PyMMUI:script_main'],
+        'console_scripts': ['PyMMUI=PyMMUI:application_main'],
     },
 )
