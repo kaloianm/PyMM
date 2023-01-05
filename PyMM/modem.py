@@ -109,7 +109,7 @@ class Modem:
     def Reset(self):
         return self._modem_object.Reset(dbus_interface=self._modem_interface_name)
 
-    def Enable(self, enable):
+    def Enable(self, enable=True):
         return self._modem_object.Enable(enable, dbus_interface=self._modem_interface_name)
 
     def CreateBearer(self, props):
