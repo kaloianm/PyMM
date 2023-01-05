@@ -44,6 +44,56 @@ class ModemState(IntEnum):
     MM_MODEM_STATE_CONNECTED = 11,
 
 
+@unique
+class ModemAccessTechnology(IntEnum):
+    '''Enumeration which represents the access technology supported by the modem. Corresponds
+       verbatim to the values from https://www.freedesktop.org/software/ModemManager/doc/latest/ModemManager/ModemManager-Flags-and-Enumerations.html#MMModemAccessTechnology.'''
+
+    MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN = 0,
+    MM_MODEM_ACCESS_TECHNOLOGY_POTS = 1 << 0,
+    MM_MODEM_ACCESS_TECHNOLOGY_GSM = 1 << 1,
+    MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT = 1 << 2,
+    MM_MODEM_ACCESS_TECHNOLOGY_GPRS = 1 << 3,
+    MM_MODEM_ACCESS_TECHNOLOGY_EDGE = 1 << 4,
+    MM_MODEM_ACCESS_TECHNOLOGY_UMTS = 1 << 5,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSDPA = 1 << 6,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSUPA = 1 << 7,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSPA = 1 << 8,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS = 1 << 9,
+    MM_MODEM_ACCESS_TECHNOLOGY_1XRTT = 1 << 10,
+    MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 = 1 << 11,
+    MM_MODEM_ACCESS_TECHNOLOGY_EVDOA = 1 << 12,
+    MM_MODEM_ACCESS_TECHNOLOGY_EVDOB = 1 << 13,
+    MM_MODEM_ACCESS_TECHNOLOGY_LTE = 1 << 14,
+    MM_MODEM_ACCESS_TECHNOLOGY_5GNR = 1 << 15,
+    MM_MODEM_ACCESS_TECHNOLOGY_LTE_CAT_M = 1 << 16,
+    MM_MODEM_ACCESS_TECHNOLOGY_LTE_NB_IOT = 1 << 17,
+    MM_MODEM_ACCESS_TECHNOLOGY_ANY = 0xFFFFFFFF,
+
+
+class ModemSimple:
+    '''Represents the simple interface for a modem managed by the ModemManager service'''
+
+    _modem_simple_interface_name = 'org.freedesktop.ModemManager1.Modem.Simple'
+
+    def __init__(self, system_bus, path):
+        self._system_bus = system_bus
+        self._path = path
+        self._modem_simple_object = self._system_bus.get_object(ModemManagerBusName, self._path)
+
+    def GetStatus(self):
+        return self._modem_simple_object.GetStatus(dbus_interface=self._modem_simple_interface_name)
+
+    def Connect(self, props):
+        return self._modem_simple_object.Connect(props,
+                                                 dbus_interface=self._modem_simple_interface_name)
+
+    def Disconnect(self):
+        return self._modem_simple_object.Disconnect(
+            '/', dbus_interface=self._modem_simple_interface_name)
+        pass
+
+
 class Modem:
     '''Represents a single modem managed by the ModemManager service'''
 
@@ -65,10 +115,8 @@ class Modem:
     def __repr__(self):
         return self._path
 
-    @property
-    def all_properties(self):
-        return self._modem_object.GetAll(self._modem_interface_name,
-                                         dbus_interface='org.freedesktop.DBus.Properties')
+    def __eq__(self, other):
+        return False if other is None else self._path == other._path
 
     @property
     def Manufacturer(self):
@@ -115,6 +163,19 @@ class Modem:
     def CreateBearer(self, props):
         print(props)
         return self._modem_object.CreateBearer(props, dbus_interface=self._modem_interface_name)
+
+    @property
+    def name(self):
+        return self._path
+
+    @property
+    def simple_interface(self):
+        return ModemSimple(self._system_bus, self._path)
+
+    @property
+    def all_properties(self):
+        return self._modem_object.GetAll(self._modem_interface_name,
+                                         dbus_interface='org.freedesktop.DBus.Properties')
 
     def get_property(self, property_name):
         return self._modem_object.Get(self._modem_interface_name, property_name,

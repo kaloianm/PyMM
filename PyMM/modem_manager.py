@@ -39,6 +39,10 @@ class ModemManager:
         return f'ModemManager'
 
     @property
+    def Version(self):
+        return self.get_property('Version')
+
+    @property
     def all_properties(self):
         return self._modem_manager_object.GetAll(self._modem_manager_interface_name,
                                                  dbus_interface='org.freedesktop.DBus.Properties')
@@ -52,10 +56,6 @@ class ModemManager:
 
         return dict(
             map(lambda x: (x[0], Modem(self._system_bus, x[0], x[1])), managed_objects.items()))
-
-    @property
-    def Version(self):
-        return self.get_property('Version')
 
     def get_property(self, property_name):
         return self._modem_manager_object.Get(self._modem_manager_interface_name, property_name,
