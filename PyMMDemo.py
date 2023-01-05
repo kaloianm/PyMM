@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#! /usr/bin/env python3
 #
 
 # Copyright 2022 Kaloian Manassiev
@@ -26,21 +26,57 @@ import logging
 from PyMM import ModemManager
 from PyMM.modem import ModemState
 
+###
+### Infrastructure classes
+###
+
 
 class Screen:
     '''Represents a generic Screen functionality in the application.'''
 
     def __init__(self, screen_title, mm):
         self._win = curses.newwin(curses.LINES - 1, curses.COLS - 1, 0, 0)
-        self._mm = mm
-        self._current_row = 0
 
-        self.add_row(0, screen_title, curses.A_BOLD)
-        self.add_row(0, '')
+        self._screen_title = screen_title
+        self._mm = mm
+
+        self._current_row = 0
+        self._choices = {}
+
+    def __show__(self):
+        assert ('This method must not be reached')
 
     def add_row(self, indent, s, format=curses.A_NORMAL):
         self._win.addstr(self._current_row, indent, s, format)
         self._current_row += 1
+
+    def add_choice(self, s, function, format=curses.A_NORMAL):
+        shortcut = str(len(self._choices))
+        self._choices[shortcut] = function
+
+        self.add_row(1, f'({shortcut}) - {s}', format)
+
+    def show(self):
+        while True:
+            self._win.clear()
+
+            self._current_row = 0
+            self._choices = {}
+
+            self.add_row(0, self._screen_title, curses.A_BOLD)
+            self.add_row(0, '')
+
+            self.__show__()
+
+            self.add_row(1, '')
+            self.add_row(1, '(Q) - Quit / Previous')
+
+            key = self._win.getkey()
+            if key == 'q' or key == 'Q':
+                break
+
+            if key in self._choices:
+                self._choices[key]()
 
 
 class ModemScreen(Screen):
@@ -51,6 +87,11 @@ class ModemScreen(Screen):
         self._modem = modem
 
 
+###
+### Specific screen implementations below
+###
+
+
 class SelectModem(Screen):
     '''Screen which prompts the caller to select a modem from the set of available modems and
        returns the new selection. If (P) is pressed, returns current_modem.'''
@@ -59,13 +100,18 @@ class SelectModem(Screen):
         super().__init__('Select modem', mm)
         self._current_modem = current_modem
 
-    def select(self):
-        self.add_row(1, '(P) Back to the previous menu')
+    def __show__(self):
 
-        while True:
-            key = self._win.getkey()
-            if key == 'p' or key == 'P':
-                return self._current_modem
+        def select_modem(m):
+            self._current_modem = m
+
+        for modem in [None] + list(self._mm.managed_modems.values()):
+            self.add_choice(modem, lambda modem=modem: select_modem(modem),
+                            curses.A_BOLD if self.selected_modem == modem else curses.A_NORMAL)
+
+    @property
+    def selected_modem(self):
+        return self._current_modem
 
 
 class UnlockModem(ModemScreen):
@@ -74,8 +120,9 @@ class UnlockModem(ModemScreen):
     def __init__(self, mm, modem):
         super().__init__('Unlock modem', mm, modem)
 
-    def unlock(self):
+    def __show__(self):
         curses.echo()
+
         self.add_row(0, 'Enter PIN: ')
         PIN = self._win.getstr(4).decode('utf-8')
         self._modem.Sim.SendPin(PIN)
@@ -87,7 +134,7 @@ class ReceivedSMS(ModemScreen):
     def __init__(self, mm, modem):
         super().__init__('Received SMS', mm, modem)
 
-    def show(self):
+    def __show__(self):
         self.add_row(1, '(P) Back to the previous menu')
 
         while True:
@@ -102,7 +149,7 @@ class SendSMS(ModemScreen):
     def __init__(self, mm, modem):
         super().__init__('Send SMS', mm, modem)
 
-    def show(self):
+    def __show__(self):
         self.add_row(1, '(P) Back to the previous menu')
 
         while True:
@@ -116,32 +163,29 @@ class Internet(ModemScreen):
 
     def __init__(self, mm, modem):
         super().__init__('Internet', mm, modem)
+        self._modem_simple = modem.simple_interface
 
-    def show(self):
-        self.add_row(1, '(0) Connect')
-        self.add_row(1, '(1) Disconnect')
-        self.add_row(1, '(P) Back to the previous menu')
-
-        while True:
-            key = self._win.getkey()
-            if key == '0':
-                self.connect()
-            if key == '1':
-                self.disconnect()
-            if key == 'p' or key == 'P':
-                break
+    def __show__(self):
+        self.add_choice('Connect', lambda: self.connect())
+        self.add_choice('Disconnect', lambda: self.disconnect())
 
     def connect(self):
+        self._modem_simple.Connect({
+            'apn': 'telefonica.es',
+            'user': 'telefonica',
+            'password': 'telefonica',
+        })
         pass
 
     def disconnect(self):
+        self._modem_simple.Disconnect()
         pass
 
 
 class MainScreen(Screen):
     '''The main screen of the application.'''
 
-    def __init__(self, mm):
+    def __init__(self, stdscr, mm):
         super().__init__(f'ModemManager {mm.Version} with {len(mm.managed_modems)} managed modems',
                          mm)
 
@@ -150,9 +194,10 @@ class MainScreen(Screen):
         else:
             self._modem = None
 
-    def start(self):
+    def __show__(self):
+        self.add_row(0, f'Active modem: {self._modem}', curses.A_BOLD)
+
         if self._modem:
-            self.add_row(0, f'Active modem: {self._modem}', curses.A_BOLD)
             self.add_row(1, f'Manufacturer: {self._modem.Manufacturer}')
             self.add_row(1, f'State: {self._modem.State.name}')
 
@@ -163,60 +208,26 @@ class MainScreen(Screen):
                     1,
                     f'SIM IMEI: {self._modem.Sim.SimIdentifier}, SIM IMSI: {self._modem.Sim.Imsi}')
 
-            self.add_row(1, '')
+        self.add_row(0, '')
+        self.add_row(0, 'Select an option from the menu:', curses.A_STANDOUT)
+        self.add_row(0, '')
 
-            self.add_row(0, f'Select an option from the menu:', curses.A_STANDOUT)
-            self.add_row(0, '')
+        def select_modem():
+            selector = SelectModem(self._mm, self._modem)
+            selector.show()
 
-            self.add_row(1, '(0) Received SMS')
-            self.add_row(1, '(1) Send SMS')
-            self.add_row(1, '(2) Internet')
-            self.add_row(1, '(M) Change active modem')
-            self.add_row(1, '(U) Unlock PIN')
-            self.add_row(1, '(E) Enable active modem')
-            self.add_row(1, '(R) Reset active modem')
+            self._modem = selector.selected_modem
 
-        self.add_row(1, '(Q) Quit')
-        self.add_row(1, ' ')
-
-        key = self._win.getkey()
+        self.add_choice('Select modem', select_modem)
 
         if self._modem:
-            if key == 'm' or key == 'M':
-                controller = SelectModem(self._mm, self._modem)
-                self._modem = controller.select()
-            if key == 'u' or key == 'U':
-                controller = UnlockModem(self._mm, self._modem)
-                controller.unlock()
-            if key == '0':
-                controller = ReceivedSMS(self._mm, self._modem)
-                controller.show()
-            if key == '1':
-                controller = SendSMS(self._mm, self._modem)
-                controller.show()
-            if key == '2':
-                controller = Internet(self._mm, self._modem)
-                controller.show()
-            if key == 'e' or key == 'E':
-                self._modem.Enable(True)
-            if key == 'r' or key == 'R':
-                self._modem.Reset()
-
-        if key == 'q' or key == 'Q':
-            return True
-
-        return False
-
-
-def wrapped_main(stdscr, mm):
-    '''Curses wrapped entrypoint for the application'''
-
-    while True:
-        stdscr.clear()
-
-        main_screen = MainScreen(mm)
-        if main_screen.start():
-            break
+            self.add_choice('Unlock SIM', lambda: UnlockModem(self._mm, self._modem).show())
+            self.add_choice('Send SMS', lambda: SendSMS(self._mm, self._modem).show())
+            self.add_choice('Received SMS', lambda: ReceivedSMS(self._mm, self._modem).show())
+            self.add_choice('Internet', lambda: Internet(self._mm, self._modem).show())
+            self.add_choice('Enable active modem', lambda: self._modem.Enable())
+            self.add_choice('Reset active modem', lambda: self._modem.Reset())
+            self.add_choice('Refresh', lambda: None)
 
 
 def application_main():
@@ -234,7 +245,7 @@ def application_main():
 
     logging.info(f'Found {mm} {mm.all_properties}')
 
-    curses.wrapper(lambda stdscr: wrapped_main(stdscr, mm))
+    curses.wrapper(lambda stdscr: MainScreen(stdscr, mm).show())
 
 
 if __name__ == '__main__':
